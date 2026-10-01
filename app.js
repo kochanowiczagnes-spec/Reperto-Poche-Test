@@ -60,6 +60,11 @@ async function migrateLegacyAttachments(){
 async function cleanupOrphanAttachments(){try{const used=new Set();Object.values(backupData()).forEach(value=>walkAttachments(value,attachment=>{if(attachment&&attachment.id)used.add(attachment.id);}));for(const id of await attachmentStoreKeys())if(!used.has(id))await attachmentStoreDelete(id);}catch{}}
 const get = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key) || 'null') || fallback; } catch { return fallback; } };
 const set = (key, value) => localStorage.setItem(key, JSON.stringify(value));
+// Profil facultatif, stocké uniquement sur cet appareil.
+const getProfile = () => get('rp-profile', {firstName:''});
+const profileFirstName = () => String(getProfile().firstName || '').trim().slice(0,40);
+const profileInitial = () => { const firstName=profileFirstName(); return firstName ? escape(firstName.slice(0,1).toLocaleUpperCase('fr')) : '◯'; };
+const profileGreeting = () => { const firstName=profileFirstName(); return firstName ? `Bonjour, ${escape(firstName)}` : 'Bonjour'; };
 const getMeds = () => get('rp-meds', medDefaults);
 const setMeds = value => set('rp-meds', value);
 const getEstablishments = () => get('rp-establishments', establishmentDefaults);
@@ -123,7 +128,7 @@ const nav = (active='home') => `<nav class="nav" aria-label="Navigation principa
   <button class="nav-add" data-add-menu aria-label="Ajouter">+</button>
   <button class="${active==='planning'?'active':''}" data-go="planning"><span>▣</span>Planning</button>
 </nav>`;
-const topbar = () => `<header class="top">${logo()}<button class="avatar" data-go="profile" aria-label="Profil">AK</button></header>`;
+const topbar = () => `<header class="top">${logo()}<button class="avatar ${profileFirstName()?'has-name':'neutral'}" data-go="profile" aria-label="Mon profil">${profileInitial()}</button></header>`;
 const category = (cls, icon, title, meta, target) => `<button class="folder ${cls}" data-go="${target}"><span class="icon">${icon}</span><h2>${title}</h2><p>${meta}</p></button>`;
 const searchText = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('fr');
 const sortByName = (a,b) => searchText(a.name || a.title).localeCompare(searchText(b.name || b.title),'fr',{numeric:true});
@@ -140,14 +145,17 @@ const contactRoleLabel = contact => [contact.role,contact.grade].filter(Boolean)
 
 function home(){
   const est = getEstablishments(); const events = getPlanning();
-  app.innerHTML = `${topbar()}<p class="eyebrow">Bonjour</p><h1 class="headline">Tout retrouver,<br>même dans l’urgence.</h1><p class="sub">Ton carnet professionnel, toujours dans la poche.</p>
+  app.innerHTML = `${topbar()}<p class="eyebrow">${profileGreeting()}</p><h1 class="headline">Tout retrouver,<br>même dans l’urgence.</h1><p class="sub">Ton carnet professionnel, toujours dans la poche.</p>
   <label class="search"><span>⌕</span><input id="global-search" placeholder="Rechercher dans Réperto’Poche" autocomplete="off" /></label>
   <section id="home-folders" class="grid">${category('emergencies','!','Urgences',`${get('rp-emergencies', emergencyDefaults).length} repère${get('rp-emergencies', emergencyDefaults).length>1?'s':''}`,'emergencies')}${category('est','⌂','Établissements',`${est.length} lieux`,'establishments')}${category('med','●','Médicaments',`${getMeds().length} fiches`,'meds')}${category('surgery','✚','Chirurgies',`${getSurgerySpecialties().length} spécialité${getSurgerySpecialties().length>1?'s':''}`,'surgery')}${category('anesthesia','◌','Anesthésies',`${getAnesthesiaTerrains().length} terrain${getAnesthesiaTerrains().length>1?'s':''}`,'anesthesia')}${category('pediatrics','♧','Pédiatrie',`${get('rp-pediatrics', pediatricsDefaults).length} repère${get('rp-pediatrics', pediatricsDefaults).length>1?'s':''}`,'pediatrics')}${category('lang','文','Langues',`${get('rp-languages', languageDefaults).length} dossiers`,'languages')}${category('docs','▤','Protocoles',`${get('rp-protocols', protocolDefaults).length} document${get('rp-protocols', protocolDefaults).length>1?'s':''}`,'protocols')}${category('notes','✎','Notes rapides',`${get('rp-notes', noteDefaults).length} note${get('rp-notes', noteDefaults).length>1?'s':''}`,'notes')}${category('plan','□','Planning',events.length ? `${events.length} créneau${events.length>1?'x':''}` : 'À organiser','planning')}</section><section id="home-search-results" class="search-results" hidden></section>${nav('home')}`;
   $('#global-search').addEventListener('input', e => globalSearch(e.target.value)); bind();
 }
 
 function profile(){
-  app.innerHTML=`${topbar()}${sectionTitle('Mes données','Sauvegarde privée sur cet iPhone','home')}<section class="detail-card backup-card"><span class="backup-icon">◈</span><div><h2>Garde une copie de tes repères</h2><p>Tes fiches, établissements, langues, notes et planning restent sur cet iPhone. Une sauvegarde te permet de les retrouver après un changement d’iPhone ou un effacement de Safari.</p></div></section><section class="backup-actions"><button class="backup-action" data-backup-export><span class="backup-action-icon">↓</span><span><strong>Sauvegarder mes données</strong><small>Fichier privé à placer dans Fichiers ou iCloud Drive</small></span></button><button class="backup-action restore" data-backup-import><span class="backup-action-icon">↑</span><span><strong>Restaurer une sauvegarde</strong><small>Remettre une copie Réperto’Poche sur cet iPhone</small></span></button></section><article class="detail-card"><h2>Stockage des fichiers</h2><p class="multiline">Les fichiers sont conservés séparément des fiches, dans le stockage étendu de l’app. Les textes restent légers ; garde une sauvegarde avant toute suppression importante.</p></article><p class="helper backup-note">Conseil : fais une sauvegarde avant une grande mise à jour et conserve-la dans iCloud Drive.</p>${nav()}`;
+  const firstName=profileFirstName();
+  app.innerHTML=`${topbar()}${sectionTitle('Mon profil','Vos préférences restent sur cet appareil.','home')}<section class="profile-identity"><span class="profile-avatar ${firstName?'has-name':'neutral'}">${profileInitial()}</span><div><h2>Me reconnaître</h2><p>Ce prénom est facultatif et reste uniquement sur cet iPhone.</p></div></section><form id="profile-form" class="profile-form"><label class="field"><span>Comment souhaitez-vous être appelée ?</span><input name="firstName" maxlength="40" value="${escape(firstName)}" placeholder="Ex. Claire" autocomplete="given-name"></label><button class="profile-save" type="submit">Enregistrer</button></form><section class="profile-data"><h2>Mes données</h2><div class="profile-local-note"><span>⌁</span><p><strong>Vos données restent sur votre appareil.</strong><br>Aucun compte ni e-mail ne sont nécessaires.</p></div><section class="backup-actions"><button class="backup-action" data-backup-export><span class="backup-action-icon">↓</span><span><strong>Sauvegarder mes données</strong><small>Créer une copie dans Fichiers ou iCloud Drive</small></span></button><button class="backup-action restore" data-backup-import><span class="backup-action-icon">↑</span><span><strong>Restaurer une sauvegarde</strong><small>Remplacer les données par une copie</small></span></button></section></section><section class="profile-help"><h2>Aide</h2><p>À propos de Réperto’Poche</p><small>Version test 0.37</small></section>${nav()}`;
+  const form=$('#profile-form');
+  form.addEventListener('submit',event=>{event.preventDefault();const firstName=String(new FormData(form).get('firstName')||'').trim().replace(/\s+/g,' ').slice(0,40);set('rp-profile',{firstName});toast(firstName?'Prénom enregistré sur cet iPhone':'Profil enregistré');profile();});
   bind();
 }
 
@@ -522,7 +530,7 @@ document.addEventListener('contextmenu',event=>{
 if('serviceWorker' in navigator){
   let refreshing=false;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!refreshing){refreshing=true;window.location.reload();}});
-  navigator.serviceWorker.register('sw.js?v=36',{updateViaCache:'none'}).then(registration=>registration.update()).catch(()=>{});
+  navigator.serviceWorker.register('sw.js?v=37',{updateViaCache:'none'}).then(registration=>registration.update()).catch(()=>{});
 }
 async function startApp(){let moved=0;try{moved=await migrateLegacyAttachments();await cleanupOrphanAttachments();}catch(error){console.warn('Migration des fichiers',error);}home();if(moved)toast(`${moved} fichier${moved>1?'s':''} déplacé${moved>1?'s':''} vers le stockage étendu`);}
 startApp();
