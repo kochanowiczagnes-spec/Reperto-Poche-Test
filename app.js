@@ -61,9 +61,10 @@ async function cleanupOrphanAttachments(){try{const used=new Set();Object.values
 const get = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key) || 'null') || fallback; } catch { return fallback; } };
 const set = (key, value) => localStorage.setItem(key, JSON.stringify(value));
 // Profil facultatif, stocké uniquement sur cet appareil.
-const getProfile = () => get('rp-profile', {firstName:''});
+const getProfile = () => get('rp-profile', {firstName:'',lastName:''});
 const profileFirstName = () => String(getProfile().firstName || '').trim().slice(0,40);
-const profileInitial = () => { const firstName=profileFirstName(); return firstName ? escape(firstName.slice(0,1).toLocaleUpperCase('fr')) : '◯'; };
+const profileLastName = () => String(getProfile().lastName || '').trim().slice(0,40);
+const profileInitial = () => { const firstName=profileFirstName(), lastName=profileLastName(); const initials=`${firstName.slice(0,1)}${lastName.slice(0,1)}`.toLocaleUpperCase('fr'); return initials ? escape(initials) : '◯'; };
 const profileGreeting = () => { const firstName=profileFirstName(); return firstName ? `Bonjour, ${escape(firstName)}` : 'Bonjour'; };
 const getMeds = () => get('rp-meds', medDefaults);
 const setMeds = value => set('rp-meds', value);
@@ -153,9 +154,9 @@ function home(){
 
 function profile(){
   const firstName=profileFirstName();
-  app.innerHTML=`${topbar()}${sectionTitle('Mon profil','Vos préférences restent sur cet appareil.','home')}<section class="profile-identity"><span class="profile-avatar ${firstName?'has-name':'neutral'}">${profileInitial()}</span><div><h2>Me reconnaître</h2><p>Ce prénom est facultatif et reste uniquement sur cet iPhone.</p></div></section><form id="profile-form" class="profile-form"><label class="field"><span>Comment souhaitez-vous être appelée ?</span><input name="firstName" maxlength="40" value="${escape(firstName)}" placeholder="Ex. Claire" autocomplete="given-name"></label><button class="profile-save" type="submit">Enregistrer</button></form><section class="profile-data"><h2>Mes données</h2><div class="profile-local-note"><span>⌁</span><p><strong>Vos données restent sur votre appareil.</strong><br>Aucun compte ni e-mail ne sont nécessaires.</p></div><section class="backup-actions"><button class="backup-action" data-backup-export><span class="backup-action-icon">↓</span><span><strong>Sauvegarder mes données</strong><small>Créer une copie dans Fichiers ou iCloud Drive</small></span></button><button class="backup-action restore" data-backup-import><span class="backup-action-icon">↑</span><span><strong>Restaurer une sauvegarde</strong><small>Remplacer les données par une copie</small></span></button></section></section><section class="profile-help"><h2>Aide</h2><p>À propos de Réperto’Poche</p><small>Version test 0.37</small></section>${nav()}`;
+  app.innerHTML=`${topbar()}${sectionTitle('Mon profil','Vos préférences restent sur cet appareil.','home')}<section class="profile-identity"><span class="profile-avatar ${firstName?'has-name':'neutral'}">${profileInitial()}</span><div><h2>Me reconnaître</h2><p>Ce prénom est facultatif et reste uniquement sur cet iPhone.</p></div></section><form id="profile-form" class="profile-form"><label class="field"><span>Prénom</span><input name="firstName" maxlength="40" value="${escape(firstName)}" placeholder="Ex. Claire" autocomplete="given-name"></label><label class="field"><span>Nom de famille <small>(facultatif)</small></span><input name="lastName" maxlength="40" value="${escape(profileLastName())}" placeholder="Ex. Martin" autocomplete="family-name"></label><button class="profile-save" type="submit">Enregistrer</button></form><section class="profile-data"><h2>Mes données</h2><div class="profile-local-note"><span>⌁</span><p><strong>Vos données restent sur votre appareil.</strong><br>Aucun compte ni e-mail ne sont nécessaires.</p></div><section class="backup-actions"><button class="backup-action" data-backup-export><span class="backup-action-icon">↓</span><span><strong>Sauvegarder mes données</strong><small>Créer une copie dans Fichiers ou iCloud Drive</small></span></button><button class="backup-action restore" data-backup-import><span class="backup-action-icon">↑</span><span><strong>Restaurer une sauvegarde</strong><small>Remplacer les données par une copie</small></span></button></section></section><section class="profile-help"><h2>Aide</h2><p>À propos de Réperto’Poche</p><small>Version test 0.38</small></section>${nav()}`;
   const form=$('#profile-form');
-  form.addEventListener('submit',event=>{event.preventDefault();const firstName=String(new FormData(form).get('firstName')||'').trim().replace(/\s+/g,' ').slice(0,40);set('rp-profile',{firstName});toast(firstName?'Prénom enregistré sur cet iPhone':'Profil enregistré');profile();});
+  form.addEventListener('submit',event=>{event.preventDefault();const values=new FormData(form);const firstName=String(values.get('firstName')||'').trim().replace(/\s+/g,' ').slice(0,40);const lastName=String(values.get('lastName')||'').trim().replace(/\s+/g,' ').slice(0,40);set('rp-profile',{firstName,lastName});toast(firstName||lastName?'Profil enregistré sur cet iPhone':'Profil enregistré');profile();});
   bind();
 }
 
@@ -530,7 +531,7 @@ document.addEventListener('contextmenu',event=>{
 if('serviceWorker' in navigator){
   let refreshing=false;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!refreshing){refreshing=true;window.location.reload();}});
-  navigator.serviceWorker.register('sw.js?v=37',{updateViaCache:'none'}).then(registration=>registration.update()).catch(()=>{});
+  navigator.serviceWorker.register('sw.js?v=38',{updateViaCache:'none'}).then(registration=>registration.update()).catch(()=>{});
 }
 async function startApp(){let moved=0;try{moved=await migrateLegacyAttachments();await cleanupOrphanAttachments();}catch(error){console.warn('Migration des fichiers',error);}home();if(moved)toast(`${moved} fichier${moved>1?'s':''} déplacé${moved>1?'s':''} vers le stockage étendu`);}
 startApp();
